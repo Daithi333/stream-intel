@@ -1,0 +1,9 @@
+# binary
+stream-intel
+
+# OS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
