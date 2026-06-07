@@ -29,6 +29,10 @@ func (p *Pipeline) Receive() <-chan model.TaxiTrip {
 	return p.chEvents
 }
 
+func (p *Pipeline) Len() int {
+	return len(p.chEvents)
+}
+
 func (p *Pipeline) Close() {
 	close(p.chEvents)
 }

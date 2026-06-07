@@ -34,6 +34,12 @@ func New(cfg config.Config, p *pipeline.Pipeline, logger *slog.Logger) (*Consume
 		return nil, err
 	}
 
+	_, err = c.GetMetadata(nil, true, 5000)
+	if err != nil {
+		c.Close()
+		return nil, fmt.Errorf("broker unreachable: %w", err)
+	}
+
 	return &Consumer{
 		client:   c,
 		pipeline: p,
@@ -53,10 +59,6 @@ func (c *Consumer) Run(ctx context.Context) error {
 			message, err := c.client.ReadMessage(100 * time.Millisecond)
 			if err != nil {
 				if kafkaErr, ok := err.(kafka.Error); ok && kafkaErr.IsTimeout() {
-					consecutiveErrors++
-					if consecutiveErrors >= maxErrors {
-						return fmt.Errorf("consumer error after %d attempts: %w", consecutiveErrors, err)
-					}
 					continue
 				}
 				consecutiveErrors++

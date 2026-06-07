@@ -9,9 +9,10 @@ import (
 )
 
 type Metrics struct {
-	eventsTotal prometheus.Counter
-	errorsTotal prometheus.Counter
-	consumerLag prometheus.Gauge
+	eventsTotal     prometheus.Counter
+	errorsTotal     prometheus.Counter
+	consumerLag     prometheus.Gauge
+	pipelineBacklog prometheus.Gauge
 }
 
 func New() *Metrics {
@@ -28,8 +29,12 @@ func New() *Metrics {
 			Name: "stream_intel_consumer_lag",
 			Help: "Consumer group lag",
 		}),
+		pipelineBacklog: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "stream_intel_pipeline_backlog",
+			Help: "Number of events buffered in the pipeline channel",
+		}),
 	}
-	prometheus.MustRegister(m.eventsTotal, m.errorsTotal, m.consumerLag)
+	prometheus.MustRegister(m.eventsTotal, m.errorsTotal, m.consumerLag, m.pipelineBacklog)
 	return m
 }
 
@@ -39,6 +44,10 @@ func (m *Metrics) RecordEvent() {
 
 func (m *Metrics) RecordError() {
 	m.errorsTotal.Inc()
+}
+
+func (m *Metrics) SetPipelineBacklog(size int) {
+	m.pipelineBacklog.Set(float64(size))
 }
 
 func (m *Metrics) Run(ctx context.Context, port string) error {

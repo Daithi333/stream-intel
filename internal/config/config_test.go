@@ -10,8 +10,8 @@ func TestLoadDefaults(t *testing.T) {
 
 	cfg := Load()
 
-	if len(cfg.KafkaBrokers) != 1 || cfg.KafkaBrokers[0] != "localhost:9092" {
-		t.Errorf("expected KafkaBrokers [localhost:9092], got %v", cfg.KafkaBrokers)
+	if len(cfg.KafkaBrokers) != 1 || cfg.KafkaBrokers[0] != "localhost:9094" {
+		t.Errorf("expected KafkaBrokers [localhost:9094], got %v", cfg.KafkaBrokers)
 	}
 	if cfg.KafkaTopic != "taxi_trips" {
 		t.Errorf("expected KafkaTopic taxi_trips, got %s", cfg.KafkaTopic)
@@ -28,6 +28,9 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.LogLevel != "info" {
 		t.Errorf("expected LogLevel info, got %s", cfg.LogLevel)
 	}
+	if cfg.PipelineBufferSize != 100 {
+		t.Errorf("expected PipelineBufferSize 100, got %d", cfg.PipelineBufferSize)
+	}
 }
 
 func TestLoadFromEnv(t *testing.T) {
@@ -37,6 +40,7 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("METRICS_PORT", "9191")
 	t.Setenv("WS_PORT", "8181")
 	t.Setenv("LOG_LEVEL", "debug")
+	t.Setenv("PIPELINE_BUFFER_SIZE", "500")
 
 	cfg := Load()
 
@@ -57,5 +61,8 @@ func TestLoadFromEnv(t *testing.T) {
 	}
 	if cfg.LogLevel != "debug" {
 		t.Errorf("expected LogLevel debug, got %s", cfg.LogLevel)
+	}
+	if cfg.PipelineBufferSize != 500 {
+		t.Errorf("expected PipelineBufferSize 500, got %d", cfg.PipelineBufferSize)
 	}
 }

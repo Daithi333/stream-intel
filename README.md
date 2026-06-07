@@ -175,8 +175,33 @@ Both consumers operate independently. Spark owns the durable analytical path (me
 
 ## Development Roadmap
 
-- [ ] Phase 1: Consumer + Prometheus metrics
+- [x] Phase 1: Consumer + Prometheus metrics
 - [ ] Phase 2: Windowed aggregations + anomaly detection
 - [ ] Phase 3: WebSocket live feed + replay support
 - [ ] CI pipeline (lint, test, build)
 - [ ] Docker image for deployment alongside the platform
+
+
+---
+
+## Go Concepts Covered
+
+### Phase 1
+- Structs, exported/unexported fields, struct tags (`json:"..."`)
+- Packages, `internal/` vs `pkg/` visibility
+- Pointers and pointer receivers (`*T`, `&T`)
+- Channels: buffered, directional (`<-chan T`), close semantics
+- `select` for multiplexing channel operations
+- Goroutines managed via `errgroup.Group`
+- `context.Context` for cancellation and shutdown propagation
+- Error handling: multi-return, wrapping with `%w`, type assertions
+- JSON unmarshalling (`encoding/json`)
+- HTTP server with graceful `Shutdown`
+- Closures as goroutine bodies
+- Signal handling (`signal.NotifyContext`)
+
+### Phase 2 (planned)
+- Interfaces (pluggable detector/sink pattern)
+- `sync.Mutex` for protecting shared state
+- Time-based sliding windows
+- Struct embedding and composition
