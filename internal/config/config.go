@@ -14,6 +14,9 @@ type Config struct {
 	WSPort             string
 	LogLevel           string
 	PipelineBufferSize int
+	DetectorInterval   int
+	FareSpikeThreshold float64
+	DeadZoneThreshold  int
 }
 
 func Load() Config {
@@ -25,6 +28,9 @@ func Load() Config {
 		WSPort:             getEnv("WS_PORT", "8080"),
 		LogLevel:           getEnv("LOG_LEVEL", "info"),
 		PipelineBufferSize: getEnvInt("PIPELINE_BUFFER_SIZE", 100),
+		DetectorInterval:   getEnvInt("DETECTOR_INTERVAL_SECS", 10),
+		FareSpikeThreshold: getEnvFloat("FARE_SPIKE_THRESHOLD", 50.0),
+		DeadZoneThreshold:  getEnvInt("DEAD_ZONE_THRESHOLD_SECS", 300),
 	}
 }
 
@@ -39,6 +45,15 @@ func getEnvInt(key string, fallback int) int {
 	if v := os.Getenv(key); v != "" {
 		if i, err := strconv.Atoi(v); err == nil {
 			return i
+		}
+	}
+	return fallback
+}
+
+func getEnvFloat(key string, fallback float64) float64 {
+	if v := os.Getenv(key); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return f
 		}
 	}
 	return fallback

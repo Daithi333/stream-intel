@@ -1,5 +1,6 @@
 # binary
-stream-intel
+/bin/
+/stream-intel
 
 # OS
 .DS_Store

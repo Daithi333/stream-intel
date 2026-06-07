@@ -76,7 +76,9 @@ func (c *Consumer) Run(ctx context.Context) error {
 				c.logger.Error("Failed to unmarshal message", "error", err)
 				continue
 			}
-			c.pipeline.Send(ctx, trip)
+			if err := c.pipeline.Send(ctx, trip); err != nil {
+				c.logger.Error("Failed to send to pipeline", "error", err)
+			}
 		}
 	}
 }

@@ -61,7 +61,7 @@ func (m *Metrics) Run(ctx context.Context, port string) error {
 
 	go func() {
 		<-ctx.Done()
-		server.Shutdown(context.Background())
+		_ = server.Shutdown(context.Background())
 	}()
 
 	return server.ListenAndServe()

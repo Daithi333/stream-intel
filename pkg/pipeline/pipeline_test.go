@@ -58,8 +58,8 @@ func TestReceiveExitsOnClose(t *testing.T) {
 	p := New(5)
 
 	ctx := context.Background()
-	p.Send(ctx, model.TaxiTrip{EventId: "a"})
-	p.Send(ctx, model.TaxiTrip{EventId: "b"})
+	_ = p.Send(ctx, model.TaxiTrip{EventId: "a"})
+	_ = p.Send(ctx, model.TaxiTrip{EventId: "b"})
 	p.Close()
 
 	var received []string
@@ -77,7 +77,7 @@ func TestBackpressure(t *testing.T) {
 	defer p.Close()
 
 	ctx := context.Background()
-	p.Send(ctx, model.TaxiTrip{EventId: "fills-buffer"})
+	_ = p.Send(ctx, model.TaxiTrip{EventId: "fills-buffer"})
 
 	// Second send should block — use a timeout context to prove it
 	timeoutCtx, cancel := context.WithTimeout(ctx, 50*time.Millisecond)

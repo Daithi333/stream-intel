@@ -119,6 +119,9 @@ Follows the [Standard Go Project Layout](https://github.com/golang-standards/pro
 # Start the shared Kafka broker (from data-streaming-platform)
 cd ../data-streaming-platform && make up && make topic-create
 
+# Enable pre-commit hooks
+git config core.hooksPath .githooks
+
 # Run the service
 go run ./cmd/stream-intel
 
