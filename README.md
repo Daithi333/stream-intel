@@ -105,6 +105,30 @@ make run
 
 ---
 
+## UI
+
+A React dashboard that connects via WebSocket and displays live zone statistics.
+
+```bash
+# Install dependencies
+make ui-install
+
+# Start dev server (localhost:5173)
+make ui-dev
+
+# Run tests
+make ui-test
+
+# Lint
+make ui-lint
+
+# Build for production
+make ui-build
+```
+
+
+---
+
 ## Observability
 
 - **Metrics**: `curl localhost:9090/metrics | grep stream_intel`

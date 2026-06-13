@@ -1,5 +1,6 @@
 #!/bin/sh
 
+# Go checks
 unformatted=$(gofmt -l .)
 if [ -n "$unformatted" ]; then
   echo "gofmt check failed. Run 'gofmt -w .' on:"
@@ -8,3 +9,11 @@ if [ -n "$unformatted" ]; then
 fi
 
 go vet ./...
+
+# UI checks
+if [ -d "ui" ]; then
+  cd ui
+  pnpm run lint || exit 1
+  pnpm run build || exit 1
+  cd ..
+fi

@@ -1,0 +1,78 @@
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.title {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.zoneCount {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.status {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.connected {
+  background: rgba(52, 211, 153, 0.15);
+  color: var(--color-success);
+}
+
+.connecting {
+  background: rgba(251, 191, 36, 0.15);
+  color: var(--color-warning);
+}
+
+.disconnected {
+  background: rgba(248, 113, 113, 0.15);
+  color: var(--color-danger);
+}
+
+.replayButton {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.replayButton:hover:not(:disabled) {
+  background: var(--color-border);
+  border-color: var(--color-accent);
+}
+
+.replayButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

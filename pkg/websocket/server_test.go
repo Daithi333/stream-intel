@@ -43,7 +43,7 @@ func TestClientReceivesBroadcast(t *testing.T) {
 
 	srv.hub.Broadcast([]byte(`{"zone":1}`))
 
-	conn.SetReadDeadline(time.Now().Add(time.Second))
+	_ = conn.SetReadDeadline(time.Now().Add(time.Second))
 	_, msg, err := conn.ReadMessage()
 	if err != nil {
 		t.Fatalf("failed to read message: %v", err)
@@ -96,7 +96,7 @@ func TestMultipleClientsReceiveBroadcast(t *testing.T) {
 	srv.hub.Broadcast([]byte("update"))
 
 	for _, conn := range []*websocket.Conn{conn1, conn2} {
-		conn.SetReadDeadline(time.Now().Add(time.Second))
+		_ = conn.SetReadDeadline(time.Now().Add(time.Second))
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
 			t.Fatalf("failed to read: %v", err)
