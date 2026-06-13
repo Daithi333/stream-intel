@@ -1,105 +1,36 @@
 # stream-intel
 
-A realtime stream intelligence service written in Go, designed as a companion to [data-streaming-platform](https://github.com/dmcelhill/data-streaming-platform).
-
-Consumes the same Kafka topic (`taxi_trips`) independently from Spark, providing low-latency operational analytics alongside the batch/lakehouse medallion architecture.
+A realtime stream intelligence service written in Go. Consumes taxi trip events from Kafka independently from Spark, providing low-latency operational analytics alongside the batch/lakehouse medallion architecture in [data-streaming-platform](https://github.com/dmcelhill/data-streaming-platform).
 
 
 ---
 
-## Purpose
+## What it does
 
-This project is a hands-on exploration of Go systems programming concepts through a realistic streaming workload:
-
-- Goroutines and worker pools (concurrent partition consumers)
-- Channels and select (internal event pipeline, backpressure)
-- Context propagation and cancellation (graceful shutdown)
-- Pointers and memory management (shared aggregation state)
-- Interfaces (pluggable detectors, sinks)
-- Synchronisation primitives (mutexes, atomics, errgroup)
+- Consumes events from Kafka in real time (concurrent partition consumers)
+- Aggregates per-zone statistics (trip count, average fare)
+- Detects anomalies (fare spikes, inactive zones) on a configurable interval
+- Exposes Prometheus metrics (`/metrics`) for operational monitoring
+- Pushes live aggregation snapshots to connected WebSocket clients
+- Supports replay (seek to earliest offset) triggered via WebSocket command
 
 
 ---
 
 ## Architecture
 
-```
-Kafka (taxi_trips topic)
-    |
-    v
-[Partition Consumers]  -- 1 goroutine per partition
-    |
-    | (bounded channels)
-    v
-[Aggregation Workers]  -- sliding window stats by zone
-    |
-    +---> [Anomaly Detector]  -- fare spikes, dead zones
-    |
-    +---> [Prometheus Exporter]  -- /metrics endpoint
-    |
-    +---> [WebSocket Server]  -- live dashboard feed
+```mermaid
+graph TD
+    K[Kafka: taxi_trips] --> C[Partition Consumers]
+    C --> |bounded channel| P[Pipeline]
+    P --> A[Aggregator]
+    A --> D[Anomaly Detectors]
+    A --> WS[WebSocket Server]
+    A --> M[Prometheus /metrics]
+    D --> S[Alert Sinks]
 ```
 
-The service runs as an independent Kafka consumer group. It does not interfere with Spark's Bronze consumer — both read from the same topic via separate group IDs.
-
-
----
-
-## Planned Capabilities
-
-### Phase 1 — Consumer and Metrics
-- Concurrent Kafka partition consumers (consumer group rebalancing)
-- Internal channel-based event pipeline
-- Prometheus metrics (events/sec, consumer lag, partition assignment)
-- Graceful shutdown via context cancellation and signal handling
-- Structured logging
-- Configuration via environment variables
-
-### Phase 2 — Aggregations and Anomaly Detection
-- Sliding window aggregations (trips/min, avg fare by pickup zone)
-- Pluggable anomaly detection interface (fare spikes, inactive zones)
-- In-memory state with mutex-protected access
-- Alerting via configurable sinks
-
-### Phase 3 — WebSocket Dashboard and Replay
-- WebSocket endpoint for live aggregation feed
-- Fan-out pattern to multiple connected clients
-- Replay mode (consume from earliest offset on demand)
-- Backpressure strategies (drop, buffer, slow consumer)
-
-
----
-
-## Project Structure
-
-```
-stream-intel/
-  cmd/
-    stream-intel/       # Application entrypoint
-      main.go
-  internal/
-    config/             # Environment-based configuration
-    consumer/           # Kafka consumer group, partition workers
-    pipeline/           # Channel-based event routing
-    aggregator/         # Windowed statistics
-    detector/           # Anomaly detection interface + implementations
-    metrics/            # Prometheus instrumentation
-    websocket/          # WebSocket server and fan-out
-  pkg/
-    model/              # Shared event types
-  deployments/
-    docker-compose.yml  # Local dev (points to shared Kafka)
-  Makefile
-  go.mod
-  go.sum
-  .gitignore
-  README.md
-```
-
-Follows the [Standard Go Project Layout](https://github.com/golang-standards/project-layout) conventions:
-- `cmd/` for application binaries
-- `internal/` for private application code (not importable by other modules)
-- `pkg/` for code that could be imported by external projects
+The service runs as an independent Kafka consumer group. It does not interfere with Spark's consumer — both read from the same topic via separate group IDs.
 
 
 ---
@@ -107,7 +38,7 @@ Follows the [Standard Go Project Layout](https://github.com/golang-standards/pro
 ## Prerequisites
 
 - Go 1.22+
-- Access to the Kafka broker from `data-streaming-platform` (default: `localhost:9092`)
+- Access to the Kafka broker from `data-streaming-platform` (default: `localhost:9094`)
 - Topic `taxi_trips` with events being produced
 
 
@@ -116,11 +47,14 @@ Follows the [Standard Go Project Layout](https://github.com/golang-standards/pro
 ## Quick Start
 
 ```bash
-# Start the shared Kafka broker (from data-streaming-platform)
-cd ../data-streaming-platform && make up && make topic-create
-
 # Enable pre-commit hooks
 git config core.hooksPath .githooks
+
+# Start the shared Kafka broker (from data-streaming-platform)
+cd ../data-streaming-platform && make up
+
+# Ensure topic exists
+docker exec dsp-kafka rpk topic create taxi_trips
 
 # Run the service
 go run ./cmd/stream-intel
@@ -134,16 +68,49 @@ cd ../data-streaming-platform && make produce
 
 ## Configuration
 
-All configuration via environment variables with sensible defaults:
+All configuration via environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `KAFKA_BROKERS` | `localhost:9092` | Comma-separated broker addresses |
+| `KAFKA_BROKERS` | `localhost:9094` | Comma-separated broker addresses |
 | `KAFKA_TOPIC` | `taxi_trips` | Topic to consume |
 | `KAFKA_GROUP_ID` | `stream-intel` | Consumer group ID |
 | `METRICS_PORT` | `9090` | Prometheus metrics HTTP port |
 | `WS_PORT` | `8080` | WebSocket server port |
-| `LOG_LEVEL` | `info` | Log level (debug, info, warn, error) |
+| `LOG_LEVEL` | `info` | Log level |
+| `PIPELINE_BUFFER_SIZE` | `100` | Internal channel buffer size |
+| `DETECTOR_INTERVAL_SECS` | `10` | How often detectors and broadcasts run |
+| `FARE_SPIKE_THRESHOLD` | `50.0` | Average fare threshold for alerts |
+| `DEAD_ZONE_THRESHOLD_SECS` | `300` | Seconds of inactivity before dead zone alert |
+
+
+---
+
+## Development
+
+```bash
+# Run tests
+make test
+
+# Build binary
+make build
+
+# Lint
+make lint
+
+# Run directly
+make run
+```
+
+
+---
+
+## Observability
+
+- **Metrics**: `curl localhost:9090/metrics | grep stream_intel`
+- **WebSocket**: connect to `ws://localhost:8080/ws` for live zone snapshots
+- **Replay**: send `{"action": "replay"}` over the WebSocket to reprocess from the beginning
+- **Alerts**: logged to stdout when fare spikes or dead zones are detected
 
 
 ---
@@ -152,59 +119,25 @@ All configuration via environment variables with sensible defaults:
 
 | Library | Purpose |
 |---------|---------|
-| [confluent-kafka-go](https://github.com/confluentinc/confluent-kafka-go) | Kafka consumer (librdkafka-based, production grade) |
+| [confluent-kafka-go](https://github.com/confluentinc/confluent-kafka-go) | Kafka consumer (librdkafka-based) |
 | [prometheus/client_golang](https://github.com/prometheus/client_golang) | Metrics exposition |
 | [gorilla/websocket](https://github.com/gorilla/websocket) | WebSocket connections |
-| [slog](https://pkg.go.dev/log/slog) | Structured logging (stdlib, Go 1.21+) |
-
-
----
-
-## Relationship to data-streaming-platform
-
-```
-[Event Producer] --> [Kafka: taxi_trips]
-                          |
-              +-----------+-----------+
-              |                       |
-     [Spark Bronze/Silver/Gold]   [stream-intel]
-     (batch lakehouse, Delta)     (realtime ops)
-```
-
-Both consumers operate independently. Spark owns the durable analytical path (medallion architecture, Delta Lake). This service owns the operational/realtime path (dashboards, alerts, metrics).
-
-
----
-
-## Development Roadmap
-
-- [x] Phase 1: Consumer + Prometheus metrics
-- [ ] Phase 2: Windowed aggregations + anomaly detection
-- [ ] Phase 3: WebSocket live feed + replay support
-- [ ] CI pipeline (lint, test, build)
-- [ ] Docker image for deployment alongside the platform
+| [slog](https://pkg.go.dev/log/slog) | Structured logging (stdlib) |
 
 
 ---
 
 ## Go Concepts Covered
 
-### Phase 1
-- Structs, exported/unexported fields, struct tags (`json:"..."`)
-- Packages, `internal/` vs `pkg/` visibility
-- Pointers and pointer receivers (`*T`, `&T`)
-- Channels: buffered, directional (`<-chan T`), close semantics
-- `select` for multiplexing channel operations
-- Goroutines managed via `errgroup.Group`
-- `context.Context` for cancellation and shutdown propagation
-- Error handling: multi-return, wrapping with `%w`, type assertions
-- JSON unmarshalling (`encoding/json`)
-- HTTP server with graceful `Shutdown`
-- Closures as goroutine bodies
-- Signal handling (`signal.NotifyContext`)
+This project is a hands-on exploration of Go through a realistic streaming workload:
 
-### Phase 2 (planned)
-- Interfaces (pluggable detector/sink pattern)
-- `sync.Mutex` for protecting shared state
-- Time-based sliding windows
-- Struct embedding and composition
+- Goroutines and errgroup (concurrent partition consumers, managed lifecycle)
+- Channels (bounded, directional, select, backpressure)
+- Context propagation and cancellation (graceful shutdown)
+- Pointers and pointer receivers (shared mutable state)
+- Interfaces (pluggable detectors, sinks)
+- sync.RWMutex (protecting aggregation state)
+- HTTP server with graceful shutdown
+- WebSocket fan-out pattern (hub, per-client goroutines)
+- JSON marshalling/unmarshalling
+- Error handling patterns (multi-return, wrapping, type assertions)

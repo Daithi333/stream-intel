@@ -86,3 +86,19 @@ func (c *Consumer) Run(ctx context.Context) error {
 func (c *Consumer) Close() {
 	c.client.Close()
 }
+
+func (c *Consumer) Replay() error {
+	assignment, err := c.client.Assignment()
+	if err != nil {
+		return fmt.Errorf("failed to get partition assignment: %w", err)
+	}
+	for i := range assignment {
+		assignment[i].Offset = kafka.OffsetBeginning
+	}
+	err = c.client.Assign(assignment)
+	if err != nil {
+		return fmt.Errorf("failed to seek to beginning: %w", err)
+	}
+	c.logger.Info("Replay initiated, seeking to beginning of all partitions")
+	return nil
+}

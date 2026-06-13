@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -14,6 +15,8 @@ import (
 	"github.com/dmcelhill/stream-intel/pkg/detector"
 	"github.com/dmcelhill/stream-intel/pkg/metrics"
 	"github.com/dmcelhill/stream-intel/pkg/pipeline"
+	"github.com/dmcelhill/stream-intel/pkg/sink"
+	ws "github.com/dmcelhill/stream-intel/pkg/websocket"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -33,17 +36,33 @@ func main() {
 		&detector.DeadZoneDetector{InactiveThreshold: time.Duration(cfg.DeadZoneThreshold) * time.Second},
 	}
 
+	hub := ws.NewHub()
+	hub.OnDrop = m.RecordDroppedMessage
+	wsSrv := ws.NewServer(hub, logger)
+	wsSrv.SetReplayFunc(c.Replay)
+
+	sinks := []sink.Sink{
+		&sink.LogSink{Logger: logger},
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	g, ctx := errgroup.WithContext(ctx)
 
-	logger.Info("stream-intel started", "brokers", cfg.KafkaBrokers, "topic", cfg.KafkaTopic, "metrics_port", cfg.MetricsPort)
+	logger.Info("stream-intel started",
+		"brokers", cfg.KafkaBrokers,
+		"topic", cfg.KafkaTopic,
+		"metrics_port", cfg.MetricsPort,
+		"ws_port", cfg.WSPort,
+	)
 
 	g.Go(func() error { return c.Run(ctx) })
 	g.Go(func() error { return m.Run(ctx, cfg.MetricsPort) })
+	g.Go(func() error { return wsSrv.Run(ctx, cfg.WSPort) })
 	g.Go(processEvents(pipe, agg, m))
-	g.Go(runDetectors(ctx, agg, detectors, time.Duration(cfg.DetectorInterval)*time.Second, logger))
+	g.Go(runDetectors(ctx, agg, detectors, sinks, time.Duration(cfg.DetectorInterval)*time.Second))
+	g.Go(broadcastSnapshots(ctx, agg, hub, time.Duration(cfg.DetectorInterval)*time.Second))
 	g.Go(shutdownOnCancel(ctx, pipe))
 
 	if err := g.Wait(); err != nil {
@@ -64,7 +83,7 @@ func processEvents(pipe *pipeline.Pipeline, agg *aggregator.Aggregator, m *metri
 	}
 }
 
-func runDetectors(ctx context.Context, agg *aggregator.Aggregator, detectors []detector.Detector, interval time.Duration, logger *slog.Logger) func() error {
+func runDetectors(ctx context.Context, agg *aggregator.Aggregator, detectors []detector.Detector, sinks []sink.Sink, interval time.Duration) func() error {
 	return func() error {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
@@ -77,9 +96,31 @@ func runDetectors(ctx context.Context, agg *aggregator.Aggregator, detectors []d
 				for _, d := range detectors {
 					alerts := d.Detect(snap)
 					for _, alert := range alerts {
-						logger.Info("Alert", "zone", alert.Zone, "type", alert.Type, "message", alert.Message)
+						for _, s := range sinks {
+							_ = s.Send(alert)
+						}
 					}
 				}
+			}
+		}
+	}
+}
+
+func broadcastSnapshots(ctx context.Context, agg *aggregator.Aggregator, hub *ws.Hub, interval time.Duration) func() error {
+	return func() error {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-ticker.C:
+				snap := agg.Snapshot()
+				data, err := json.Marshal(snap)
+				if err != nil {
+					continue
+				}
+				hub.Broadcast(data)
 			}
 		}
 	}

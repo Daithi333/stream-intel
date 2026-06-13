@@ -13,6 +13,7 @@ type Metrics struct {
 	errorsTotal     prometheus.Counter
 	consumerLag     prometheus.Gauge
 	pipelineBacklog prometheus.Gauge
+	droppedMessages prometheus.Counter
 }
 
 func New() *Metrics {
@@ -33,8 +34,12 @@ func New() *Metrics {
 			Name: "stream_intel_pipeline_backlog",
 			Help: "Number of events buffered in the pipeline channel",
 		}),
+		droppedMessages: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "stream_intel_ws_dropped_messages_total",
+			Help: "Total messages dropped due to slow WebSocket clients",
+		}),
 	}
-	prometheus.MustRegister(m.eventsTotal, m.errorsTotal, m.consumerLag, m.pipelineBacklog)
+	prometheus.MustRegister(m.eventsTotal, m.errorsTotal, m.consumerLag, m.pipelineBacklog, m.droppedMessages)
 	return m
 }
 
@@ -48,6 +53,10 @@ func (m *Metrics) RecordError() {
 
 func (m *Metrics) SetPipelineBacklog(size int) {
 	m.pipelineBacklog.Set(float64(size))
+}
+
+func (m *Metrics) RecordDroppedMessage() {
+	m.droppedMessages.Inc()
 }
 
 func (m *Metrics) Run(ctx context.Context, port string) error {
